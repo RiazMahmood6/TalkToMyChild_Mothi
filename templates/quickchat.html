@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Quick Chat</title>
+<style>
+  :root{
+    --bg-deep:#0a1410;--bg-panel:#0f1b16;--bg-card:#11211a;
+    --ink:#e8f0ea;--ink-soft:#8aa093;--line:#ffffff12;
+    --accent:#34d399;--accent-dim:#1f6f54;--danger:#e25555;--radius:20px;
+    --font:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  html,body{height:100%;}
+  body{font-family:var(--font);color:var(--ink);
+    background:radial-gradient(130% 70% at 50% -5%,#12241c 0%,var(--bg-deep) 55%);
+    display:flex;flex-direction:column;}
+
+  header{display:flex;align-items:center;justify-content:space-between;
+    padding:16px 18px;border-bottom:1px solid var(--line);flex-shrink:0;}
+  .back{color:var(--ink-soft);text-decoration:none;font-size:15px;display:flex;align-items:center;gap:6px;}
+  .h-title{font-size:15px;font-weight:700;}
+  .h-sub{font-size:11px;color:var(--ink-soft);}
+  .voice-btn{display:flex;align-items:center;gap:6px;background:var(--bg-panel);
+    border:1px solid var(--line);color:var(--ink);text-decoration:none;
+    font-size:13px;padding:8px 14px;border-radius:999px;transition:border-color .15s;}
+  .voice-btn:hover{border-color:#34d39955;}
+
+  #messages{flex:1;overflow-y:auto;padding:20px 16px;max-width:600px;width:100%;
+    margin:0 auto;display:flex;flex-direction:column;gap:12px;}
+  .msg{max-width:80%;padding:11px 15px;border-radius:16px;font-size:15px;line-height:1.45;}
+  .msg.user{align-self:flex-end;background:var(--accent);color:#052017;border-bottom-right-radius:4px;}
+  .msg.assistant{align-self:flex-start;background:var(--bg-card);border:1px solid var(--line);
+    border-bottom-left-radius:4px;}
+  .msg.typing{align-self:flex-start;background:var(--bg-card);border:1px solid var(--line);
+    color:var(--ink-soft);font-style:italic;border-bottom-left-radius:4px;}
+  .empty-hint{text-align:center;color:var(--ink-soft);font-size:14px;margin-top:40px;line-height:1.6;}
+
+  form#composer{flex-shrink:0;border-top:1px solid var(--line);padding:14px 16px;
+    display:flex;gap:10px;max-width:600px;width:100%;margin:0 auto;box-sizing:border-box;}
+  #text-input{flex:1;background:var(--bg-panel);border:1px solid var(--line);border-radius:999px;
+    color:var(--ink);padding:13px 18px;font-size:15px;font-family:inherit;outline:none;}
+  #text-input:focus{border-color:var(--accent);}
+  #send-btn{background:var(--accent);color:#052017;border:none;border-radius:999px;
+    width:46px;height:46px;flex-shrink:0;font-size:18px;cursor:pointer;transition:transform .1s;}
+  #send-btn:active{transform:scale(.92);}
+  #send-btn:disabled{filter:grayscale(.6) brightness(.7);cursor:default;}
+</style>
+</head>
+<body>
+
+<header>
+  <a class="back" href="/">‹ Back</a>
+  <div style="text-align:center;">
+    <div class="h-title">Quick Chat</div>
+    <div class="h-sub">No character — plain assistant</div>
+  </div>
+  <a class="voice-btn" href="/call?generic=1">🎙️ Voice</a>
+</header>
+
+<div id="messages">
+  <div class="empty-hint" id="empty-hint">Say hi! This is a plain assistant chat —<br>no character, nothing remembered between visits.</div>
+</div>
+
+<form id="composer">
+  <input type="text" id="text-input" placeholder="Type a message…" autocomplete="off">
+  <button type="submit" id="send-btn">➤</button>
+</form>
+
+<script>
+  const messagesEl = document.getElementById("messages");
+  const emptyHint = document.getElementById("empty-hint");
+  const form = document.getElementById("composer");
+  const input = document.getElementById("text-input");
+  const sendBtn = document.getElementById("send-btn");
+
+  // Client-side running history sent to the (stateless) backend each turn.
+  let history = [];
+
+  function addMessage(role, text){
+    if (emptyHint) emptyHint.remove();
+    const div = document.createElement("div");
+    div.className = `msg ${role}`;
+    div.textContent = text;
+    messagesEl.appendChild(div);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+    return div;
+  }
+
+  function addTyping(){
+    const div = document.createElement("div");
+    div.className = "msg typing";
+    div.textContent = "…";
+    messagesEl.appendChild(div);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+    return div;
+  }
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const text = input.value.trim();
+    if (!text) return;
+
+    input.value = "";
+    input.disabled = true;
+    sendBtn.disabled = true;
+
+    addMessage("user", text);
+    const typingEl = addTyping();
+
+    try {
+      const r = await fetch("/api/chat/generic", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text, history }),
+      });
+      const data = await r.json();
+      typingEl.remove();
+      if (!r.ok) throw new Error(data.error || "Something went wrong");
+
+      addMessage("assistant", data.reply);
+      history.push({ role: "user", content: text });
+      history.push({ role: "assistant", content: data.reply });
+      if (history.length > 20) history = history.slice(-20);
+    } catch (err) {
+      typingEl.remove();
+      addMessage("assistant", `⚠️ ${err.message}`);
+    } finally {
+      input.disabled = false;
+      sendBtn.disabled = false;
+      input.focus();
+    }
+  });
+
+  input.focus();
+</script>
+</body>
+</html>

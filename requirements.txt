@@ -1,0 +1,11 @@
+Flask==3.0.3
+python-dotenv==1.0.1
+requests==2.32.3
+httpx>=0.27,<0.28
+groq>=0.13.0
+SQLAlchemy>=2.0.43
+Flask-SQLAlchemy==3.1.1
+
+# Real-time voice agent (voice_agent.py). Installs Silero VAD, Groq STT/LLM,
+# Cartesia TTS, and the WebSocket server transport.
+pipecat-ai[groq,cartesia,silero,websocket]==1.3.0

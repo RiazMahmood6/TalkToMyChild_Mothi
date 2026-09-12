@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>TalkToMyChild</title>
+<style>
+  :root {
+    --bg-deep:#0a1410; --bg-panel:#0f1b16; --bg-card:#11211a;
+    --ink:#e8f0ea; --ink-soft:#8aa093; --line:#ffffff12;
+    --accent:#34d399; --accent-dim:#1f6f54; --danger:#e25555;
+    --radius:20px;
+    --font:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{
+    font-family:var(--font); color:var(--ink);
+    background:radial-gradient(130% 70% at 50% -5%,#12241c 0%,var(--bg-deep) 55%);
+    min-height:100vh;
+  }
+  .wrap{max-width:480px;margin:0 auto;padding:28px 20px 60px;}
+  header{text-align:center;margin-bottom:8px;}
+  .logo{font-size:13px;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);}
+  h1{font-size:26px;font-weight:700;letter-spacing:-.01em;margin-top:6px;}
+  .lede{color:var(--ink-soft);font-size:15px;margin:10px 0 0;line-height:1.5;text-align:center;}
+
+  /* Child profile button */
+  .child-btn{
+    display:inline-flex;align-items:center;gap:7px;margin:14px auto 26px;
+    padding:10px 18px;border-radius:999px;background:var(--bg-panel);
+    border:1px solid var(--line);color:var(--ink-soft);text-decoration:none;
+    font-size:13px;transition:border-color .15s,color .15s;
+  }
+  .child-btn:hover{border-color:#34d39955;color:var(--ink);}
+  .child-btn .profile-name{color:var(--accent);font-weight:600;}
+
+  .filters{display:flex;gap:8px;margin-bottom:20px;overflow-x:auto;padding-bottom:4px;}
+  .chip{
+    flex:0 0 auto;padding:9px 16px;border-radius:999px;border:1px solid var(--line);
+    background:var(--bg-panel);color:var(--ink-soft);font-size:14px;cursor:pointer;
+    transition:all .15s;
+  }
+  .chip.active{background:var(--ink);color:#06140e;border-color:var(--ink);font-weight:600;}
+
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  .card{
+    background:var(--bg-card);border:1px solid var(--line);border-radius:var(--radius);
+    overflow:hidden;cursor:pointer;transition:transform .15s,border-color .15s;
+    display:flex;flex-direction:column;
+  }
+  .card:hover{transform:translateY(-2px);border-color:#34d39955;}
+  .card .photo{aspect-ratio:1/1;width:100%;object-fit:cover;background:#0c1813;}
+  .card .photo.placeholder{display:flex;align-items:center;justify-content:center;font-size:38px;color:var(--accent-dim);}
+  .card .body{padding:12px 13px 15px;}
+  .badge{display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--accent);margin-bottom:7px;}
+  .badge::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--accent);}
+  .card h3{font-size:16px;font-weight:600;}
+  .card p{font-size:12px;color:var(--ink-soft);margin-top:3px;line-height:1.35;}
+  .card .mem{font-size:11px;color:var(--accent-dim);margin-top:8px;}
+
+  .add{
+    border:1.5px dashed #ffffff22;background:transparent;align-items:center;
+    justify-content:center;min-height:190px;color:var(--ink-soft);gap:10px;
+  }
+  .add .plus{width:54px;height:54px;border-radius:50%;background:var(--bg-panel);
+    display:flex;align-items:center;justify-content:center;font-size:26px;color:var(--ink);}
+  .add span{font-size:14px;font-weight:600;color:var(--ink);}
+
+  .quick{
+    grid-column:1/-1;display:flex;align-items:center;gap:12px;
+    background:var(--bg-card);border:1px solid var(--line);border-radius:var(--radius);
+    padding:14px 16px;cursor:pointer;transition:border-color .15s,transform .15s;
+  }
+  .quick:hover{border-color:#34d39955;transform:translateY(-1px);}
+  .quick .ic{width:42px;height:42px;border-radius:12px;background:#16291f;
+    display:flex;align-items:center;justify-content:center;font-size:19px;flex-shrink:0;}
+  .quick .t b{display:block;font-size:14px;}
+  .quick .t small{color:var(--ink-soft);font-size:12px;}
+
+  .mem-row{display:flex;align-items:center;justify-content:space-between;gap:6px;margin-top:8px;}
+  .transcript-link{font-size:11px;color:var(--ink-soft);background:none;border:1px solid var(--line);
+    border-radius:999px;padding:3px 9px;cursor:pointer;flex-shrink:0;}
+  .transcript-link:hover{color:var(--ink);border-color:#34d39955;}
+
+  /* modal */
+  .modal{position:fixed;inset:0;background:#04100acc;backdrop-filter:blur(4px);
+    display:none;align-items:flex-end;justify-content:center;z-index:50;}
+  .modal.open{display:flex;}
+  .sheet{background:var(--bg-deep);border-top-left-radius:26px;border-top-right-radius:26px;
+    width:100%;max-width:480px;max-height:92vh;overflow-y:auto;padding:26px 22px 30px;
+    border:1px solid var(--line);}
+  .sheet h2{font-size:20px;margin-bottom:4px;}
+  .sheet .hint{color:var(--ink-soft);font-size:13px;margin-bottom:20px;line-height:1.5;}
+  label{display:block;font-size:12px;letter-spacing:.05em;text-transform:uppercase;
+    color:var(--ink-soft);margin:16px 0 7px;}
+  input[type=text],textarea,select{
+    width:100%;background:var(--bg-panel);border:1px solid var(--line);border-radius:14px;
+    color:var(--ink);padding:13px 14px;font-size:15px;font-family:inherit;
+  }
+  input:focus,textarea:focus,select:focus{outline:none;border-color:var(--accent);}
+  textarea{resize:vertical;min-height:76px;}
+  .row{display:flex;gap:12px;}
+  .row>div{flex:1;}
+  .filebtn{
+    display:flex;align-items:center;gap:12px;background:var(--bg-panel);border:1px solid var(--line);
+    border-radius:14px;padding:14px;margin-top:8px;cursor:pointer;
+  }
+  .filebtn .ic{width:34px;height:34px;border-radius:9px;background:#16291f;display:flex;
+    align-items:center;justify-content:center;color:var(--accent);}
+  .filebtn .t b{display:block;font-size:14px;}
+  .filebtn .t small{color:var(--ink-soft);font-size:12px;}
+  .filebtn.set{border-color:var(--accent);}
+  .btn{
+    width:100%;padding:16px;border:none;border-radius:var(--radius);font-size:16px;
+    font-weight:700;cursor:pointer;margin-top:24px;transition:filter .15s,transform .1s;
+  }
+  .btn:active{transform:scale(.99);}
+  .btn-primary{background:var(--accent);color:#052017;}
+  .btn-primary:disabled{filter:grayscale(.6) brightness(.7);cursor:default;}
+  .btn-ghost{background:transparent;color:var(--ink-soft);margin-top:8px;}
+  .consent{font-size:12px;color:var(--ink-soft);background:#16291f55;border:1px solid var(--line);
+    border-radius:12px;padding:11px 13px;margin-top:18px;line-height:1.5;}
+  .consent b{color:var(--ink);}
+  .err{color:var(--danger);font-size:14px;margin-top:12px;min-height:18px;}
+  .empty{grid-column:1/-1;text-align:center;color:var(--ink-soft);padding:40px 0;font-size:14px;}
+  .loading{text-align:center;color:var(--ink-soft);padding:50px 0;}
+  .t-msg{max-width:82%;padding:9px 13px;border-radius:14px;font-size:14px;line-height:1.4;margin-bottom:10px;}
+  .t-msg.user{margin-left:auto;background:var(--accent);color:#052017;}
+  .t-msg.assistant{background:var(--bg-panel);border:1px solid var(--line);}
+  .t-empty{color:var(--ink-soft);font-size:14px;text-align:center;padding:30px 0;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="logo">TalkToMyChild</div>
+    <h1>Who would you like to call?</h1>
+  </header>
+  <p class="lede">Characters are built from a loved one's voice, shared with their consent.</p>
+
+  <div style="text-align:center;">
+    <a href="/child" class="child-btn" id="child-btn">
+      🧒 <span id="child-btn-label">Set up child profile</span>
+    </a>
+  </div>
+
+  <div class="filters" id="filters">
+    <button class="chip active" data-cat="all">All</button>
+    <button class="chip" data-cat="Family">Family</button>
+    <button class="chip" data-cat="Friend">Friends</button>
+  </div>
+
+  <div class="grid" id="grid">
+    <div class="loading">Loading characters…</div>
+  </div>
+</div>
+
+<!-- Create modal -->
+<div class="modal" id="modal">
+  <div class="sheet">
+    <h2>Add a character</h2>
+    <p class="hint">Create a loved one, family member, or friend. The details help the character speak more like them.</p>
+
+    <label>Character name *</label>
+    <input type="text" id="f-name" placeholder="e.g. Dad">
+
+    <div class="row">
+      <div>
+        <label>Age</label>
+        <input type="text" id="f-age" placeholder="e.g. 45">
+      </div>
+      <div>
+        <label>Gender</label>
+        <input type="text" id="f-gender" placeholder="e.g. Male">
+      </div>
+    </div>
+
+    <label>Role</label>
+    <input type="text" id="f-role" placeholder="e.g. Father, Grandmother">
+
+    <label>Category</label>
+    <select id="f-category">
+      <option value="Family">Family</option>
+      <option value="Friend">Friend</option>
+      <option value="Other">Other</option>
+    </select>
+
+    <label>Brief description</label>
+    <textarea id="f-desc" placeholder="Personality, the way they talk, things they'd say…"></textarea>
+
+    <label>Voice sample * (the person's own voice, with their consent)</label>
+    <div class="filebtn" id="voice-btn">
+      <div class="ic">🎙️</div>
+      <div class="t"><b id="voice-label">Choose audio file</b><small>5–20s of clear speech (wav/mp3/m4a)</small></div>
+    </div>
+    <input type="file" id="f-voice" accept="audio/*" hidden>
+
+    <label>Character image (optional)</label>
+    <div class="filebtn" id="img-btn">
+      <div class="ic">🖼️</div>
+      <div class="t"><b id="img-label">Choose image</b><small>Shown on the call screen</small></div>
+    </div>
+    <input type="file" id="f-image" accept="image/*" hidden>
+
+    <div class="consent">
+      <b>Consent matters.</b> Only upload a voice from someone who agreed to it.
+      Cloning a person's voice without permission isn't supported.
+    </div>
+
+    <div class="err" id="create-err"></div>
+
+    <button class="btn btn-primary" id="create-btn">Create character</button>
+    <button class="btn btn-ghost" id="cancel-btn">Cancel</button>
+  </div>
+</div>
+
+<!-- Transcript modal -->
+<div class="modal" id="transcript-modal">
+  <div class="sheet">
+    <h2 id="transcript-title">Call transcript</h2>
+    <p class="hint">Raw turn-by-turn transcript from the most recent live call.</p>
+    <div id="transcript-list"></div>
+    <button class="btn btn-ghost" id="transcript-close-btn">Close</button>
+  </div>
+</div>
+
+<script>
+const grid = document.getElementById("grid");
+let currentCat = "all";
+
+// Show child profile badge if one has been saved
+(function() {
+  try {
+    const p = JSON.parse(localStorage.getItem("ttmc_child_profile_v1") || "null");
+    if (p && p.name) {
+      document.getElementById("child-btn-label").innerHTML =
+        `Child profile: <span class="profile-name">${esc(p.name)}</span>`;
+    }
+  } catch(e) {}
+})();
+
+async function loadCharacters() {
+  grid.innerHTML = `<div class="loading">Loading characters…</div>`;
+  let chars = [];
+  try {
+    const r = await fetch("/api/characters");
+    chars = await r.json();
+  } catch (e) {
+    grid.innerHTML = `<div class="empty">Couldn't load characters. Is the server running?</div>`;
+    return;
+  }
+  render(chars);
+}
+
+function render(chars) {
+  const filtered = currentCat === "all"
+    ? chars
+    : chars.filter(c => (c.category || "") === currentCat);
+
+  let html = `
+    <div class="quick" onclick="location.href='/quickchat'">
+      <div class="ic">⚡</div>
+      <div class="t"><b>Quick chat</b><small>No character — type or talk to a plain assistant</small></div>
+    </div>`;
+  for (const c of filtered) {
+    const img = c.image_path
+      ? `<img class="photo" src="/static/${c.image_path}" alt="${esc(c.name)}">`
+      : `<div class="photo placeholder">${esc((c.name||"?")[0])}</div>`;
+    html += `
+      <div class="card" onclick="location.href='/call?char=${c.id}'">
+        ${img}
+        <div class="body">
+          <div class="badge">Available</div>
+          <h3>${esc(c.name)}</h3>
+          <p>${esc(c.role || c.category || "Tap to call")}</p>
+          <div class="mem-row">
+            ${c.has_memory ? `<div class="mem">✓ Remembers your last call</div>` : `<span></span>`}
+            ${c.has_transcript ? `<button class="transcript-link" onclick="event.stopPropagation(); openTranscript(${c.id})">Transcript</button>` : ``}
+          </div>
+        </div>
+      </div>`;
+  }
+  html += `
+    <div class="card add" onclick="openModal()">
+      <div class="plus">+</div>
+      <span>Create character</span>
+    </div>`;
+  if (filtered.length === 0) {
+    html += `<div class="empty">No characters yet in this category.</div>`;
+  }
+  grid.innerHTML = html;
+}
+
+function esc(s){return String(s).replace(/[&<>"]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[m]));}
+
+// filters
+document.getElementById("filters").addEventListener("click", e => {
+  if (!e.target.classList.contains("chip")) return;
+  document.querySelectorAll(".chip").forEach(c=>c.classList.remove("active"));
+  e.target.classList.add("active");
+  currentCat = e.target.dataset.cat;
+  loadCharacters();
+});
+
+// modal + file pickers
+const modal = document.getElementById("modal");
+function openModal(){ modal.classList.add("open"); }
+function closeModal(){ modal.classList.remove("open"); }
+document.getElementById("cancel-btn").onclick = closeModal;
+modal.addEventListener("click", e => { if (e.target === modal) closeModal(); });
+
+// transcript modal
+const transcriptModal = document.getElementById("transcript-modal");
+const transcriptList = document.getElementById("transcript-list");
+document.getElementById("transcript-close-btn").onclick = () => transcriptModal.classList.remove("open");
+transcriptModal.addEventListener("click", e => { if (e.target === transcriptModal) transcriptModal.classList.remove("open"); });
+
+async function openTranscript(charId){
+  transcriptList.innerHTML = `<div class="t-empty">Loading…</div>`;
+  transcriptModal.classList.add("open");
+  try {
+    const r = await fetch(`/api/characters/${charId}/transcript`);
+    const data = await r.json();
+    const msgs = data.transcript || [];
+    if (!msgs.length){
+      transcriptList.innerHTML = `<div class="t-empty">No transcript yet for this call.</div>`;
+      return;
+    }
+    transcriptList.innerHTML = msgs.map(m =>
+      `<div class="t-msg ${m.role==='user'?'user':'assistant'}">${esc(m.content||"")}</div>`
+    ).join("");
+  } catch(e){
+    transcriptList.innerHTML = `<div class="t-empty">Couldn't load the transcript.</div>`;
+  }
+}
+
+const voiceInput = document.getElementById("f-voice");
+const imgInput = document.getElementById("f-image");
+document.getElementById("voice-btn").onclick = ()=>voiceInput.click();
+document.getElementById("img-btn").onclick = ()=>imgInput.click();
+voiceInput.onchange = ()=>{
+  if(voiceInput.files[0]){
+    document.getElementById("voice-label").textContent = voiceInput.files[0].name;
+    document.getElementById("voice-btn").classList.add("set");
+  }
+};
+imgInput.onchange = ()=>{
+  if(imgInput.files[0]){
+    document.getElementById("img-label").textContent = imgInput.files[0].name;
+    document.getElementById("img-btn").classList.add("set");
+  }
+};
+
+// create
+document.getElementById("create-btn").onclick = async () => {
+  const err = document.getElementById("create-err");
+  err.textContent = "";
+  const name = document.getElementById("f-name").value.trim();
+  if (!name) { err.textContent = "Please enter a name."; return; }
+  if (!voiceInput.files[0]) { err.textContent = "Please add a voice sample."; return; }
+
+  const btn = document.getElementById("create-btn");
+  btn.disabled = true; btn.textContent = "Creating & cloning voice…";
+
+  const fd = new FormData();
+  fd.append("name", name);
+  fd.append("age", document.getElementById("f-age").value.trim());
+  fd.append("gender", document.getElementById("f-gender").value.trim());
+  fd.append("role", document.getElementById("f-role").value.trim());
+  fd.append("category", document.getElementById("f-category").value);
+  fd.append("description", document.getElementById("f-desc").value.trim());
+  fd.append("voice_sample", voiceInput.files[0]);
+  if (imgInput.files[0]) fd.append("image", imgInput.files[0]);
+
+  try {
+    const r = await fetch("/api/characters", { method:"POST", body:fd });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || "Create failed");
+    closeModal();
+    // reset form
+    document.querySelectorAll(".sheet input[type=text], .sheet textarea").forEach(i=>i.value="");
+    voiceInput.value=""; imgInput.value="";
+    document.getElementById("voice-label").textContent="Choose audio file";
+    document.getElementById("img-label").textContent="Choose image";
+    document.querySelectorAll(".filebtn").forEach(b=>b.classList.remove("set"));
+    loadCharacters();
+  } catch (e) {
+    err.textContent = e.message;
+  } finally {
+    btn.disabled = false; btn.textContent = "Create character";
+  }
+};
+
+loadCharacters();
+</script>
+</body>
+</html>

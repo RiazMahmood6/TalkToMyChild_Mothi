@@ -1,0 +1,338 @@
+{
+  "info": {
+    "name": "TalkToMyChild API (Cartesia + Memory)",
+    "description": "Test collection for the upgraded backend.\n\nWhat changed from the RunPod version:\n- TTS + cloning use Cartesia. No ngrok / PUBLIC_BASE_URL.\n- Characters are cloned ONCE at creation; voice_id stored on them.\n- Test TTS takes an optional `voice_id` (not a voice_sample_path).\n- New: 11b Call Turn (STREAM) — live STT->LLM->TTS streaming.\n- New: 14 Call End — summarises the conversation into the character's rolling memory.\n\nSet the `baseUrl` collection variable and run top-to-bottom. `character_id` and `voice_id` are auto-saved after Create Character.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:5000", "type": "string" },
+    { "key": "character_id", "value": "", "type": "string" },
+    { "key": "voice_id", "value": "", "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "0. Health Check",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/health",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "health"]
+        },
+        "description": "Verifies GROQ_API_KEY and CARTESIA_API_KEY are set. `cloning_enabled` should be true once CARTESIA_API_KEY is present."
+      },
+      "response": []
+    },
+    {
+      "name": "1. Test STT (upload audio)",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            { "key": "audio", "type": "file", "src": [], "description": "Any short clip with clear speech (mp3/wav/webm/m4a)." }
+          ]
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/test/stt",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "test", "stt"]
+        },
+        "description": "Groq Whisper alone. Returns {\"text\": \"...\", \"bytes\": N}."
+      },
+      "response": []
+    },
+    {
+      "name": "2. Test LLM (text prompt)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"prompt\": \"Say hi like a friendly grandfather on the phone with his grandchild.\",\n  \"system\": \"You are a warm, kind grandfather. Keep replies under 2 sentences.\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/test/llm",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "test", "llm"]
+        },
+        "description": "Groq LLM alone. Returns {\"reply\": \"...\"}."
+      },
+      "response": []
+    },
+    {
+      "name": "3. Test TTS (preset voice)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"text\": \"Hello! This is a test of text to speech.\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/test/tts",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "test", "tts"]
+        },
+        "description": "Cartesia TTS with the preset fallback voice (CARTESIA_FALLBACK_VOICE_ID). Response is WAV — Save Response -> Save to a file to play it. No cloning needed."
+      },
+      "response": []
+    },
+    {
+      "name": "4. Test TTS (cloned voice_id)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"text\": \"Hello! This should sound like the cloned voice.\",\n  \"voice_id\": \"{{voice_id}}\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/test/tts",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "test", "tts"]
+        },
+        "description": "Voice cloning. Uses the {{voice_id}} auto-saved by Create Character (step 6). Returns WAV in the cloned voice. No ngrok needed — Cartesia references the voice by id."
+      },
+      "response": []
+    },
+    {
+      "name": "5. List Characters",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/characters",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "characters"]
+        },
+        "description": "All characters for the demo user."
+      },
+      "response": []
+    },
+    {
+      "name": "6. Create Character",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "if (pm.response.code === 201) {",
+              "  const data = pm.response.json();",
+              "  pm.collectionVariables.set('character_id', data.id);",
+              "  if (data.voice_id) pm.collectionVariables.set('voice_id', data.voice_id);",
+              "  console.log('Saved character_id:', data.id);",
+              "  console.log('Saved voice_id:', data.voice_id);",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            { "key": "name", "value": "Test Dad", "type": "text" },
+            { "key": "age", "value": "45", "type": "text" },
+            { "key": "gender", "value": "Male", "type": "text" },
+            { "key": "role", "value": "Father", "type": "text" },
+            { "key": "category", "value": "Family", "type": "text" },
+            { "key": "description", "value": "Warm, patient, loves dad jokes.", "type": "text" },
+            { "key": "voice_sample", "type": "file", "src": [], "description": "REQUIRED: audio with ~5-20s of clear speech. Cloned via Cartesia on upload." },
+            { "key": "image", "type": "file", "src": [], "description": "Optional portrait." }
+          ]
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/characters",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "characters"]
+        },
+        "description": "Creates a character and clones the uploaded voice via Cartesia. On success: 201 with character JSON including `voice_id`. Both character_id and voice_id are auto-saved to collection variables."
+      },
+      "response": []
+    },
+    {
+      "name": "7. Get Character",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/characters/{{character_id}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "characters", "{{character_id}}"]
+        },
+        "description": "Details for the saved character_id. Note `voice_id` and `has_memory` fields."
+      },
+      "response": []
+    },
+    {
+      "name": "8. Preview Voice (cloned)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"text\": \"Hi! It's me. This is what I sound like now.\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/characters/{{character_id}}/preview",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "characters", "{{character_id}}", "preview"]
+        },
+        "description": "Preview line in the character's voice (uses its stored voice_id; falls back to preset if cloning failed). Returns WAV."
+      },
+      "response": []
+    },
+    {
+      "name": "9. Call Start (clear history)",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/call/{{character_id}}/start",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "call", "{{character_id}}", "start"]
+        },
+        "description": "Clears in-memory conversation history. Long-term memory (from Call End) is NOT cleared — it persists on the character."
+      },
+      "response": []
+    },
+    {
+      "name": "10. Call Greeting",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/call/{{character_id}}/greeting",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "call", "{{character_id}}", "greeting"]
+        },
+        "description": "Opening line. Body = WAV. Header X-Reply-Text holds the spoken text (URL-encoded)."
+      },
+      "response": []
+    },
+    {
+      "name": "11. Call Turn (simple, non-streaming)",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            { "key": "audio", "type": "file", "src": [], "description": "Audio of what the kid said. 1-30s." }
+          ]
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/call/{{character_id}}/turn",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "call", "{{character_id}}", "turn"]
+        },
+        "description": "Full round trip, NON-streaming (easiest to test in Postman). STT->LLM->TTS. Body = WAV reply. Headers X-User-Text, X-Reply-Text (URL-encoded)."
+      },
+      "response": []
+    },
+    {
+      "name": "11c. Call Message (text only, character)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"text\": \"What did we talk about last time?\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/call/{{character_id}}/message",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "call", "{{character_id}}", "message"]
+        },
+        "description": "TEXT-ONLY turn for a character — no audio in, no audio out. Returns {\"user_text\": \"...\", \"reply\": \"...\"}. Shares the same in-memory history as '11. Call Turn' and '11b. Call Turn (STREAM)', so this can be mixed with audio-based turns in the same session. This is what the call screen's 'Type instead' toggle uses."
+      },
+      "response": []
+    },
+    {
+      "name": "11d. Chat Generic (text only, no character)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"text\": \"Hi, who are you?\",\n  \"history\": []\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/chat/generic",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "chat", "generic"]
+        },
+        "description": "TEXT-ONLY chat with NO character (the 'Quick Chat' page). Stateless on the server — the client sends the running conversation back each turn in `history` ([{\"role\":\"user\"|\"assistant\",\"content\":\"...\"}]). Returns {\"reply\": \"...\"}. Uses the same persona as `python voice_agent.py --generic`, so it matches the generic voice call."
+      },
+      "response": []
+    },
+    {
+      "name": "11b. Call Turn (STREAM - live)",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            { "key": "audio", "type": "file", "src": [], "description": "Audio of what the kid said." }
+          ]
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/call/{{character_id}}/turn_stream",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "call", "{{character_id}}", "turn_stream"]
+        },
+        "description": "LIVE turn. STT -> streaming LLM -> streaming TTS, sentence by sentence.\n\nResponse body is RAW PCM (s16le), streamed as it's generated — NOT a playable WAV file on its own. Postman can't play raw PCM directly; this endpoint is meant for the frontend client to play through the Web Audio API.\n\nHeaders:\n  X-User-Text  — what STT heard (URL-encoded)\n  X-Sample-Rate — PCM sample rate (e.g. 44100)\n\nTo verify in Postman, just confirm you get a 200 with a large binary body and the X-User-Text header. Get the final reply text via Call History (step 12) after."
+      },
+      "response": []
+    },
+    {
+      "name": "12. Call History",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/call/{{character_id}}/history",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "call", "{{character_id}}", "history"]
+        },
+        "description": "Conversation so far (in-memory, current server process)."
+      },
+      "response": []
+    },
+    {
+      "name": "14. Call End (summarise -> memory)",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/call/{{character_id}}/end",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "call", "{{character_id}}", "end"]
+        },
+        "description": "Ends the session: summarises the conversation into the character's rolling long-term memory, then clears in-memory history.\n\nReturns {\"ok\": true, \"memory\": \"...\"}. Run Get Character (step 7) afterwards and you'll see has_memory = true. Start a new call (steps 9-11) and the character will remember."
+      },
+      "response": []
+    },
+    {
+      "name": "13. Delete Character",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/characters/{{character_id}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "characters", "{{character_id}}"]
+        },
+        "description": "Deletes the character and its local files (image + voice sample). Note: the Cartesia clone itself is not deleted by this — remove it in the Cartesia dashboard if needed."
+      },
+      "response": []
+    }
+  ]
+}

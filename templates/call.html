@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Call</title>
+<style>
+  :root{
+    --bg-deep:#0a1410;--bg-panel:#0f1b16;--ink:#e8f0ea;--ink-soft:#8aa093;
+    --accent:#34d399;--accent-dim:#1f6f54;--danger:#e25555;--radius:22px;
+    --font:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:var(--font);color:var(--ink);
+    background:radial-gradient(120% 80% at 50% -10%,#12241c 0%,var(--bg-deep) 55%);}
+  #root{min-height:100vh;display:flex;flex-direction:column;align-items:center;
+    justify-content:space-between;padding:48px 24px 40px;max-width:440px;margin:0 auto;}
+  .back{position:fixed;top:18px;left:18px;color:var(--ink-soft);text-decoration:none;
+    font-size:15px;display:flex;align-items:center;gap:6px;}
+  .top{width:100%;text-align:center;}
+  .status{font-size:13px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--ink-soft);margin-bottom:38px;transition:color .3s;}
+  .status.live{color:var(--accent);}
+  .avatar-wrap{position:relative;display:inline-block;margin-bottom:26px;}
+  .avatar{width:132px;height:132px;border-radius:50%;object-fit:cover;
+    background:var(--bg-panel);border:2px solid #ffffff14;
+    display:flex;align-items:center;justify-content:center;font-size:48px;color:var(--accent-dim);}
+  .halo{position:absolute;inset:-14px;border-radius:50%;border:2px solid var(--accent);opacity:0;transition:opacity .25s;}
+  .speaking .halo{opacity:1;animation:pulse 1.4s ease-in-out infinite;}
+  @keyframes pulse{0%,100%{transform:scale(1);opacity:.35;}50%{transform:scale(1.06);opacity:.9;}}
+  .name{font-size:30px;font-weight:700;letter-spacing:-.01em;}
+  .sub{font-size:15px;color:var(--ink-soft);margin-top:6px;}
+  .wave{display:flex;gap:4px;align-items:center;height:46px;margin:34px 0;}
+  .wave span{width:4px;border-radius:2px;background:var(--accent-dim);height:8px;transition:height .12s ease;}
+  .listening .wave span{background:var(--accent);}
+  .controls{display:flex;flex-direction:column;align-items:center;gap:16px;width:100%;}
+  .hangup{width:68px;height:68px;border-radius:50%;border:none;background:var(--danger);
+    color:#fff;font-size:26px;cursor:pointer;box-shadow:0 8px 30px #e2555540;transition:transform .15s;}
+  .hangup:active{transform:scale(.92);}
+  .hint{font-size:13px;color:var(--ink-soft);min-height:18px;text-align:center;}
+  .start{width:100%;padding:18px;border:none;border-radius:var(--radius);background:var(--accent);
+    color:#052017;font-size:17px;font-weight:700;cursor:pointer;transition:filter .15s,transform .15s;}
+  .start:active{transform:scale(.98);}
+  .start:disabled{filter:grayscale(.6) brightness(.7);cursor:default;}
+  .err{color:var(--danger);font-size:14px;margin-top:12px;text-align:center;min-height:18px;}
+  .transcript-btn{background:transparent;border:1px solid #ffffff22;color:var(--ink-soft);
+    padding:10px 18px;border-radius:999px;font-size:13px;cursor:pointer;margin-top:4px;}
+  .transcript-btn:hover{border-color:#34d39955;color:var(--ink);}
+  .transcript-overlay{position:fixed;inset:0;background:#04100acc;backdrop-filter:blur(4px);
+    display:none;align-items:flex-end;justify-content:center;z-index:60;}
+  .transcript-overlay.open{display:flex;}
+  .transcript-sheet{background:var(--bg-deep);border-top-left-radius:26px;border-top-right-radius:26px;
+    width:100%;max-width:440px;max-height:78vh;display:flex;flex-direction:column;
+    border:1px solid #ffffff14;}
+  .transcript-head{display:flex;align-items:center;justify-content:space-between;
+    padding:18px 20px 14px;border-bottom:1px solid #ffffff12;}
+  .transcript-head h3{font-size:16px;font-weight:700;}
+  .transcript-close{background:none;border:none;color:var(--ink-soft);font-size:20px;cursor:pointer;}
+  .transcript-body{overflow-y:auto;padding:16px 20px 24px;display:flex;flex-direction:column;gap:10px;}
+  .t-msg{max-width:82%;padding:9px 13px;border-radius:14px;font-size:14px;line-height:1.4;}
+  .t-msg.user{align-self:flex-end;background:var(--accent);color:#052017;}
+  .t-msg.assistant{align-self:flex-start;background:var(--bg-panel);border:1px solid #ffffff12;}
+  .t-empty{color:var(--ink-soft);font-size:14px;text-align:center;padding:30px 0;}
+  .mode-link{background:none;border:none;color:var(--ink-soft);font-size:13px;
+    text-decoration:underline;cursor:pointer;margin-top:2px;}
+  .mode-link:hover{color:var(--ink);}
+
+  /* Inline text-chat mode (character calls only) */
+  body.chat-mode #root{display:none;}
+  #chat-panel{display:none;}
+  body.chat-mode #chat-panel{display:flex;}
+  #chat-panel{position:fixed;inset:0;flex-direction:column;}
+  .chat-head{display:flex;align-items:center;justify-content:space-between;
+    padding:16px 18px;border-bottom:1px solid #ffffff12;flex-shrink:0;}
+  .chat-head .h-title{font-size:15px;font-weight:700;}
+  .chat-head .h-sub{font-size:11px;color:var(--ink-soft);}
+  .voice-back{display:flex;align-items:center;gap:6px;background:var(--bg-panel);
+    border:1px solid #ffffff14;color:var(--ink);text-decoration:none;
+    font-size:13px;padding:8px 14px;border-radius:999px;cursor:pointer;}
+  #chat-messages{flex:1;overflow-y:auto;padding:20px 16px;max-width:600px;width:100%;
+    margin:0 auto;display:flex;flex-direction:column;gap:12px;box-sizing:border-box;}
+  .cmsg{max-width:80%;padding:11px 15px;border-radius:16px;font-size:15px;line-height:1.45;}
+  .cmsg.user{align-self:flex-end;background:var(--accent);color:#052017;border-bottom-right-radius:4px;}
+  .cmsg.assistant{align-self:flex-start;background:var(--bg-panel);border:1px solid #ffffff12;
+    border-bottom-left-radius:4px;}
+  .cmsg.typing{align-self:flex-start;color:var(--ink-soft);font-style:italic;}
+  #chat-composer{flex-shrink:0;border-top:1px solid #ffffff12;padding:14px 16px;
+    display:flex;gap:10px;max-width:600px;width:100%;margin:0 auto;box-sizing:border-box;}
+  #chat-input{flex:1;background:var(--bg-panel);border:1px solid #ffffff14;border-radius:999px;
+    color:var(--ink);padding:13px 18px;font-size:15px;font-family:inherit;outline:none;}
+  #chat-input:focus{border-color:var(--accent);}
+  #chat-send{background:var(--accent);color:#052017;border:none;border-radius:999px;
+    width:46px;height:46px;flex-shrink:0;font-size:18px;cursor:pointer;}
+  #chat-send:disabled{filter:grayscale(.6) brightness(.7);cursor:default;}
+</style>
+</head>
+<body>
+<a class="back" href="/">‹ Back</a>
+<div id="root"></div>
+
+<div class="transcript-overlay" id="transcript-overlay">
+  <div class="transcript-sheet">
+    <div class="transcript-head">
+      <h3>Call transcript</h3>
+      <button class="transcript-close" id="transcript-close">✕</button>
+    </div>
+    <div class="transcript-body" id="transcript-body"></div>
+  </div>
+</div>
+
+<div id="chat-panel">
+  <div class="chat-head">
+    <div>
+      <div class="h-title" id="chat-title">Text chat</div>
+      <div class="h-sub">Typed instead of spoken</div>
+    </div>
+    <button class="voice-back" id="chat-back">🎙️ Back to voice</button>
+  </div>
+  <div id="chat-messages"></div>
+  <form id="chat-composer">
+    <input type="text" id="chat-input" placeholder="Type a message…" autocomplete="off">
+    <button type="submit" id="chat-send">➤</button>
+  </form>
+</div>
+
+<script type="module">
+  const params = new URLSearchParams(location.search);
+  const charId = params.get("char");
+  const isGeneric = params.get("generic") === "1";
+
+  const CONFIG = {
+    wsBase: params.get("ws") || null,   // overrides agent url if provided
+    name: "…", subtitle: "", image: null,
+    sampleRate: 16000,
+  };
+
+  const root = document.getElementById("root");
+  let ws, audioCtx, micStream, processor, playbackTime = 0, speaking = false;
+
+  function render(state){
+    root.className = state.cls || "";
+    const avatar = CONFIG.image
+      ? `<img class="avatar" src="${CONFIG.image}" alt="">`
+      : `<div class="avatar">${(CONFIG.name||"?")[0]}</div>`;
+    root.innerHTML = `
+      <div class="top">
+        <div class="status ${state.live?"live":""}">${state.status}</div>
+        <div class="avatar-wrap"><div class="halo"></div>${avatar}</div>
+        <div class="name">${CONFIG.name}</div>
+        <div class="sub">${state.sub ?? CONFIG.subtitle}</div>
+      </div>
+      <div class="wave">${Array.from({length:13}).map(()=>"<span></span>").join("")}</div>
+      <div class="controls">${state.controls}</div>
+      <div class="err">${state.err||""}</div>`;
+    const s = root.querySelector(".start"); if (s) s.onclick = startCall;
+    const h = root.querySelector(".hangup"); if (h) h.onclick = ()=>endCall(false);
+  }
+  function setSpeaking(on){ speaking=on; root.classList.toggle("speaking",on); root.classList.toggle("listening",!on); }
+  function animateWave(level){
+    const bars = root.querySelectorAll(".wave span");
+    bars.forEach((b,i)=>{
+      const c=Math.abs(i-bars.length/2);
+      const h=8+level*38*(1-c/bars.length)*(0.6+Math.random()*0.7);
+      b.style.height=Math.min(46,h)+"px";
+    });
+  }
+  function modeLinkHtml(){
+    if (isGeneric) return `<a class="mode-link" href="/quickchat">💬 Prefer typing? Use Quick Chat</a>`;
+    if (charId) return `<button class="mode-link" id="type-instead">💬 Type instead</button>`;
+    return "";
+  }
+  function wireModeLink(){
+    const t = document.getElementById("type-instead");
+    if (t) t.onclick = enterChatMode;
+  }
+  function showIdle(err){
+    render({status:"Ready to call",sub:CONFIG.subtitle||"Tap to start",
+      controls:`<button class="start">Start call</button>${modeLinkHtml()}`,err});
+    wireModeLink();
+  }
+
+  async function init(){
+    if (isGeneric){
+      CONFIG.name = "Assistant";
+      CONFIG.subtitle = "Quick call — no character";
+      CONFIG.image = null;
+      // Generic agent has no dedicated /api/health entry, so default to the
+      // conventional next port up (8766) unless ?ws= was given explicitly.
+      if (!CONFIG.wsBase) CONFIG.wsBase = "ws://localhost:8766";
+      showIdle();
+      return;
+    }
+    if (!charId){ root.innerHTML="<p style='padding:40px;text-align:center'>No character selected. <a href='/' style='color:#34d399'>Go back</a></p>"; return; }
+    try {
+      const [cr, hr] = await Promise.all([
+        fetch(`/api/characters/${charId}`),
+        fetch(`/api/health`)
+      ]);
+      const c = await cr.json();
+      const h = await hr.json();
+      if (!cr.ok) throw new Error(c.error||"Character not found");
+      CONFIG.name = c.name;
+      CONFIG.subtitle = c.role || c.category || "";
+      CONFIG.image = c.image_path ? `/static/${c.image_path}` : null;
+      if (!CONFIG.wsBase) CONFIG.wsBase = h.agent_ws_url || "ws://localhost:8765";
+    } catch(e){
+      root.innerHTML=`<p style='padding:40px;text-align:center'>${e.message}. <a href='/' style='color:#34d399'>Go back</a></p>`;
+      return;
+    }
+    showIdle();
+  }
+
+  async function startCall(){
+    render({status:"Connecting…",controls:`<button class="start" disabled>Connecting…</button>`});
+    try{
+      micStream = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,channelCount:1}});
+    }catch(e){ showIdle("Microphone permission is needed to make a call."); return; }
+
+    audioCtx = new (window.AudioContext||window.webkitAudioContext)({sampleRate:CONFIG.sampleRate});
+    playbackTime = audioCtx.currentTime;
+
+    ws = new WebSocket(CONFIG.wsBase);
+    ws.binaryType = "arraybuffer";
+    ws.onopen = ()=>{
+      render({status:"Connected",live:true,cls:"listening",sub:"Say hello!",
+        controls:`<button class="hangup" title="End call">✕</button><div class="hint">Listening… just talk</div>`});
+      startMic();
+    };
+    ws.onmessage = (ev)=>{ if(ev.data instanceof ArrayBuffer){ setSpeaking(true); playPCM(new Int16Array(ev.data)); } };
+    ws.onclose = ()=>endCall(true);
+    ws.onerror = ()=>showIdle(isGeneric
+      ? "Couldn't reach the call. Make sure the generic voice agent is running (python voice_agent.py --generic --port 8766)."
+      : "Couldn't reach the call. Make sure the voice agent is running for this character.");
+  }
+
+  function startMic(){
+    const source = audioCtx.createMediaStreamSource(micStream);
+    processor = audioCtx.createScriptProcessor(2048,1,1);
+    source.connect(processor); processor.connect(audioCtx.destination);
+    processor.onaudioprocess = (e)=>{
+      const input = e.inputBuffer.getChannelData(0);
+      let sum=0; for(let i=0;i<input.length;i++) sum+=input[i]*input[i];
+      if(!speaking) animateWave(Math.sqrt(sum/input.length));
+      if(ws && ws.readyState===WebSocket.OPEN){
+        const pcm=new Int16Array(input.length);
+        for(let i=0;i<input.length;i++){const s=Math.max(-1,Math.min(1,input[i]));pcm[i]=s<0?s*0x8000:s*0x7fff;}
+        ws.send(pcm.buffer);
+      }
+    };
+  }
+
+  function playPCM(int16){
+    const f=new Float32Array(int16.length);
+    for(let i=0;i<int16.length;i++) f[i]=int16[i]/0x8000;
+    const buf=audioCtx.createBuffer(1,f.length,CONFIG.sampleRate);
+    buf.getChannelData(0).set(f);
+    const src=audioCtx.createBufferSource();
+    src.buffer=buf; src.connect(audioCtx.destination);
+    const now=audioCtx.currentTime;
+    if(playbackTime<now) playbackTime=now;
+    src.start(playbackTime); playbackTime+=buf.duration;
+    src.onended=()=>{ if(playbackTime<=audioCtx.currentTime+0.05) setSpeaking(false); };
+  }
+
+  function endCall(){
+    try{processor&&processor.disconnect();}catch{}
+    try{micStream&&micStream.getTracks().forEach(t=>t.stop());}catch{}
+    try{ws&&ws.readyState===WebSocket.OPEN&&ws.close();}catch{}
+    try{audioCtx&&audioCtx.close();}catch{}
+    ws=processor=micStream=audioCtx=null;
+    const transcriptBtn = (!isGeneric && charId)
+      ? `<button class="transcript-btn" id="view-transcript">View transcript</button>` : "";
+    render({status:"Call ended",sub:"Talk again soon",
+      controls:`<button class="start">Call again</button>${transcriptBtn}${modeLinkHtml()}`});
+    const t = document.getElementById("view-transcript");
+    if (t) t.onclick = openTranscript;
+    wireModeLink();
+  }
+
+  async function openTranscript(){
+    const overlay = document.getElementById("transcript-overlay");
+    const body = document.getElementById("transcript-body");
+    body.innerHTML = `<div class="t-empty">Loading…</div>`;
+    overlay.classList.add("open");
+    try{
+      const r = await fetch(`/api/characters/${charId}/transcript`);
+      const data = await r.json();
+      const msgs = data.transcript || [];
+      if (!msgs.length){
+        body.innerHTML = `<div class="t-empty">No transcript yet for this call.</div>`;
+        return;
+      }
+      body.innerHTML = msgs.map(m =>
+        `<div class="t-msg ${m.role==='user'?'user':'assistant'}">${escapeHtml(m.content||"")}</div>`
+      ).join("");
+    }catch(e){
+      body.innerHTML = `<div class="t-empty">Couldn't load the transcript.</div>`;
+    }
+  }
+  function escapeHtml(s){
+    return String(s).replace(/[&<>"]/g, m => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[m]));
+  }
+  document.getElementById("transcript-close").onclick = ()=>{
+    document.getElementById("transcript-overlay").classList.remove("open");
+  };
+  document.getElementById("transcript-overlay").addEventListener("click", e=>{
+    if (e.target.id === "transcript-overlay") e.currentTarget.classList.remove("open");
+  });
+
+  // ---- Inline text-chat mode (character calls only) ----
+  function enterChatMode(){
+    document.getElementById("chat-title").textContent = `${CONFIG.name} (text)`;
+    document.body.classList.add("chat-mode");
+    document.getElementById("chat-input").focus();
+  }
+  function exitChatMode(){
+    document.body.classList.remove("chat-mode");
+  }
+  document.getElementById("chat-back").onclick = exitChatMode;
+
+  function addChatMsg(role, text){
+    const div = document.createElement("div");
+    div.className = `cmsg ${role}`;
+    div.textContent = text;
+    const list = document.getElementById("chat-messages");
+    list.appendChild(div);
+    list.scrollTop = list.scrollHeight;
+    return div;
+  }
+
+  document.getElementById("chat-composer").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const input = document.getElementById("chat-input");
+    const sendBtn = document.getElementById("chat-send");
+    const text = input.value.trim();
+    if (!text) return;
+
+    input.value = ""; input.disabled = true; sendBtn.disabled = true;
+    addChatMsg("user", text);
+    const typingEl = addChatMsg("typing", "…");
+
+    try {
+      const r = await fetch(`/api/call/${charId}/message`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text }),
+      });
+      const data = await r.json();
+      typingEl.remove();
+      if (!r.ok) throw new Error(data.error || "Something went wrong");
+      addChatMsg("assistant", data.reply);
+    } catch (err) {
+      typingEl.remove();
+      addChatMsg("assistant", `⚠️ ${err.message}`);
+    } finally {
+      input.disabled = false; sendBtn.disabled = false; input.focus();
+    }
+  });
+
+  init();
+</script>
+</body>
+</html>
